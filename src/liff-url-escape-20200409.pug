@@ -1,0 +1,81 @@
+extends /layouts/default
+
+block beforehtml
+  - const title = 'LIFF 沒有 escape 的錯誤'
+
+block style
+  style
+    :sass
+      [v-cloak]
+        display: none
+
+block content
+  #app.container.my-3(v-cloak)
+    h2.text-center.my-3= title
+    h4.my-3 請將此連結複製到聊天視窗內貼上再打開
+    .input-group.my-3
+      input.form-control(type="url", ref="liff", :value="liff", readonly)
+      .input-group-append
+        button.btn.btn-outline-success(type="button", @click="btnCopy") 複製
+        a.btn.btn-outline-success(:href="liff") 開啟
+    h4.my-3 參數帶入結果 {{ version }}
+    pre.my-3 #[code.language-json {{ code }}]
+    button.my-3.btn.btn-block.btn-outline-primary(type="button", @click="btnLiffInit") 點此執行 liff.init
+    h4.my-3 Google Maps 的網址應該要是
+    pre.my-3 #[code.language-none {{ gmap }}]
+
+block script
+  script(src="https://cdn.jsdelivr.net/npm/vconsole@3/dist/vconsole.min.js")
+  script(src="https://static.line-scdn.net/liff/edge/2/sdk.js")
+  script.
+    const vConsole = new VConsole() // eslint-disable-line
+    const genGoogleMapUrl = (query, queryPlaceId) => {
+      const gmap = new URL('https://www.google.com/maps/search/')
+      gmap.searchParams.set('api', '1')
+      gmap.searchParams.set('query', query)
+      if (queryPlaceId) gmap.searchParams.set('query_place_id', queryPlaceId)
+      return gmap.href
+    }
+    const vm = new Vue({ // eslint-disable-line
+      el: '#app',
+      data: {
+        code: '',
+        gmap: genGoogleMapUrl('24.959276,121.419008', 'ChIJ40_T2-scaDQRF36Y2c_qORY'),
+        liff: '',
+        version: '',
+      },
+      async mounted () {
+        this.liff = this.genLiffUrl(this.gmap)
+        this.version = liff.getVersion()
+        const liffState = this.getSearchParams(location.href, 'liff.state')
+        this.code = JSON.stringify({
+          locationSearch: location.search,
+          liffState,
+          gmapFromLiffState: this.getSearchParams(new URL(liffState, 'https://localhost'), 'u'),
+          gmapFromLocationSearch: this.getSearchParams(location.href, 'u'),
+        }, null, 2)
+      },
+      methods: {
+        async btnLiffInit () {
+          await liff.init({ liffId: '1654046335-48OjmpAl' })
+        },
+        getSearchParams (url, name) {
+          return new URL(url).searchParams.get(name)
+        },
+        genLiffUrl (u) {
+          const url = new URL('https://liff.line.me/1654046335-48OjmpAl/')
+          url.searchParams.set('u', u)
+          return url.href
+        },
+        async btnCopy () {
+          const copyText = this.$refs.liff
+          copyText.select()
+          copyText.setSelectionRange(0, 99999) // For mobile devices
+          document.execCommand('copy')
+          await Swal.fire({
+            icon: 'success',
+            title: '複製成功',
+          })
+        },
+      },
+    })

@@ -1,0 +1,182 @@
+extends /layouts/default
+
+block beforehtml
+  - const title = '玩命賽道 DOWNFORCE'
+
+block style
+  meta(property="fb:app_id", content="2133031763635285")
+  meta(property="og:description", content="「玩命賽道 DOWNFORCE」的電子計分紙。")
+  meta(property="og:image:height", content="640")
+  meta(property="og:image:width", content="1280")
+  meta(property="og:image", content="https://i.imgur.com/bg0DXnF.png")
+  meta(property="og:locale", content="zh_TW")
+  meta(property="og:site_name", content="筆記國度")
+  meta(property="og:title", content=title)
+  meta(property="og:type", content="website")
+  meta(property="og:url", content="https://taichunmin.idv.tw/pug/boardgame-downforce.html")
+  style
+    :sass
+      [v-cloak]
+        display: none
+      #app
+        font-size: .8rem
+        tr.tr-cars
+          th, td
+            line-height: 2rem
+        .my-btn-outline-gray
+          border-color: gray
+        .form-control-sm.p-0
+          height: calc(1.5em + 2px)
+        .dropdown-menu
+          padding: 0
+
+block content
+  #app.container.text-monospace(v-cloak)
+    img.my-3.mx-auto(src='https://i.imgur.com/NeeiNfS.jpg', style="max-width: 915px; width: 100%; display: block")
+    .input-group.input-group-sm.mb-3
+      .input-group-prepend
+        span.input-group-text 駕駛員
+      input.form-control(type="text", v-model="i.name")
+    table.table.table-sm.table-bordered.text-center
+      tr
+        th(colspan="6") 競標金額
+      tr
+        th.text-nowrap(v-for="car in cars", :style="{'background-color': car.bg}")
+          i.fa.fa-car.fa-fw.mr-1(:style="{color: car.color}")
+          | {{ car.name }}
+      tr
+        td(v-for="(car, cid) in cars", :style="{'background-color': car.bg}")
+          .dropdown
+            button.btn.btn-sm.btn-block.my-btn-outline-gray.dropdown-toggle.p-0(type="button", data-toggle="dropdown") {{ i.auction[car.id] }}M
+            .dropdown-menu(:class="{'dropdown-menu-right': cid >= 3}")
+              button.dropdown-item(type="button", v-for="payout in [0,1,2,3,4,5,6]", @click="$set(i.auction, car.id, payout)") {{ payout }}M
+    table.table.table-sm.table-bordered.text-center
+      tr
+        th.align-middle(colspan="4") 下注獎金
+      template(v-for="(betting, bid) in [[9, 6, 3], [6, 4, 2], [3, 2, 1]]")
+        tr
+          th.align-middle(rowspan="2") {{ '①②③'[bid] }}
+          td(colspan="3")
+            .dropdown
+              button.btn.btn-sm.btn-block.my-btn-outline-gray.dropdown-toggle(v-for="car in [_.find(cars, {id: i.betting[bid]})]", :style="{'background-color': _.get(car, 'bg', '#fff')}", type="button", data-toggle="dropdown")
+                template(v-if="!car")
+                  | 請點此下注
+                template(v-else)
+                  i.fa.fa-car.fa-fw(:style="{color: car.color}")
+                  |  {{ car.name }}
+              .dropdown-menu
+                button.dropdown-item(type="button", @click="$set(i.betting, bid, '')")
+                  i.fa.fa-question.fa-fw
+                  |  無
+                button.dropdown-item(type="button", v-for="car in cars", :style="{'background-color': car.bg}", @click="$set(i.betting, bid, car.id)")
+                  i.fa.fa-car.fa-fw(:style="{color: car.color}")
+                  |  {{ car.name }}
+        tr
+          td.text-center(v-for="(payout, pid) in betting", :class="{'table-active': i.payouts[bid+1] === payout}", @click="$set(i.payouts, bid+1, (i.payouts[bid+1] === payout ? 0 : payout))")
+            i.fa.fa-fw.fa-check-square-o(v-if="i.payouts[bid+1] === payout")
+            i.fa.fa-fw.fa-square-o(v-else)
+            | {{ payout }}M
+    table.table.table-sm.table-bordered.text-center
+      tr
+        th(colspan="5") 賽車獎金
+      tr
+        th(v-for="(rv, rk) in i.racing", :class="{'table-active': rv}", @click="$set(i.racing, rk, 1-rv)") {{ '①②③④⑤'[rk] }}
+      tr
+        td(v-for="(rv, rk) in i.racing", :class="{'table-active': rv}", @click="$set(i.racing, rk, 1-rv)")
+          i.fa.fa-fw.fa-check-square-o(v-if="rv")
+          i.fa.fa-fw.fa-square-o(v-else)
+          | {{ racingPayouts[rk] }}M
+    table.table.table-sm.table-borderless.text-center
+      tr
+        th.align-middle 得#[br]分
+        td
+          input.form-control.form-control-sm.text-center.p-0(readonly, :value="score.racing + 'M'")
+          small 賽車獎金
+        td.align-middle +
+        td
+          input.form-control.form-control-sm.text-center.p-0(readonly, :value="score.betting + 'M'")
+          small 下注獎金
+        td.align-middle.text-danger -
+        td.text-danger
+          input.form-control.form-control-sm.text-center.p-0(readonly, :value="score.auction + 'M'", style="border-color: #dc3545; color: #dc3545")
+          small 競標金額
+        td.align-middle =
+        td
+          input.form-control.form-control-sm.text-center.p-0(readonly, :value="score.score + 'M'")
+          small 總獎金
+    button.btn.btn-danger.btn-block.my-3(type="button", @click="btnReset") 清除資料
+
+block script
+  script.
+    const defaultInput = {
+      betting: ['', '', ''],
+      name: '',
+      payouts: [0, 0, 0, 0],
+      racing: [0, 0, 0, 0, 0],
+      auction: {
+        black: 0,
+        blue: 0,
+        green: 0,
+        yellow: 0,
+        orange: 0,
+        red: 0,
+      },
+    }
+    const vm = new Vue({ // eslint-disable-line
+      el: '#app',
+      data: () => {
+        const vueData = {
+          i: _.cloneDeep(defaultInput),
+          cars: [
+            { id: 'black', bg: '#D4DCE2', color: '#73797D', name: '黑' },
+            { id: 'blue', bg: '#D0FBFB', color: '#36AFB6', name: '藍' },
+            { id: 'green', bg: '#D3F4A0', color: '#439D3A', name: '綠' },
+            { id: 'yellow', bg: '#F6FFA7', color: '#FCD508', name: '黃' },
+            { id: 'orange', bg: '#FCE399', color: '#FD7719', name: '橘' },
+            { id: 'red', bg: '#FDC092', color: '#F33E21', name: '紅' },
+          ],
+          racingPayouts: [12, 9, 6, 4, 2],
+        }
+        // load i data from localStorage
+        try {
+          const saved = JSON.parse(localStorage.getItem(location.pathname))
+          vueData.i = { ...vueData.i, ...saved }
+        } catch (err) {}
+        return vueData
+      },
+      async mounted () {
+        // save i to localStorage
+        this.$watch('i', (newVal, oldVal) => {
+          localStorage.setItem(location.pathname, JSON.stringify(newVal))
+        }, { deep: true })
+      },
+      computed: {
+        score () {
+          const racing = _.sumBy(_.toPairs(this.i.racing), p => (p[1] ? this.racingPayouts[p[0]] : 0))
+          const betting = this.i.payouts[1] + this.i.payouts[2] + this.i.payouts[3]
+          const auction = _.sum(_.values(this.i.auction))
+          return {
+            racing,
+            betting,
+            auction,
+            score: racing + betting - auction,
+          }
+        },
+      },
+      methods: {
+        async btnReset () {
+          const result = await Swal.fire({
+            cancelButtonText: '取消',
+            confirmButtonText: '重設',
+            icon: 'question',
+            reverseButtons: true,
+            showCancelButton: true,
+            text: '請問你是否要把表單內的資料重設為預設資料？',
+            title: '重設為預設資料',
+          })
+          if (!result.isConfirmed) return
+    
+          this.$set(this, 'i', _.cloneDeep(defaultInput))
+        },
+      },
+    })
